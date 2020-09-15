@@ -1,0 +1,191 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+</head>
+<body>
+    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="css_reset.css">
+    <div ng-app="myApp" ng-controller="myCtrl">
+        <div class="main">
+            <div class="media" style="flex:2">
+                <input type="button" value="Guardados" ng-click="abrirGuardados=!abrirGuardados" />
+                <div ng-if="abrirGuardados">
+                    <div ng-if="guardados.length==0">No hay elementos guardados</div>
+                    <div class="guardados">
+                        <span ng-repeat="g in guardados| orderBy :'nombre'"><button ng-click="Seleccionar(g.nombre)">{{g.nombre}} </button><button ng-click="Eliminar(g.nombre)">x</button></span>
+                    </div>
+                </div>
+                <input type="button" value="Guardar" ng-click="Guardar()" ng-disabled="nombreArchivo==undefined || nombreArchivo.trim()==''" /> <input ng-model="nombreArchivo" placeholder="Nombre del Archivo" /><br />
+                <input type="number" ng-model="numLeds" step="1" />
+                <div class="seccion" ng-repeat="s in secciones track by $index">
+                    <button class="agregar-previo" ng-click="secciones.splice($index,0,{ tipo:'bloque', colores:['#f3900f'] })">+ Agregar seccion antes</button>
+                    <br />
+                    <input type="radio" value="none" ng-model="s.tipo" />Ninguno
+                    <input type="radio" value="bloque" ng-model="s.tipo" />Bloque
+                    <input type="radio" value="escalonado" ng-model="s.tipo" />Escalonado
+                    <input type="radio" value="pausa" ng-model="s.tipo" />Pausa
+                    <br />
+                    <div ng-if="s.tipo!='pausa'" ng-repeat="c in s.colores">
+                        <input type="color" ng-model="c" ng-on-change="colorPicked(s, $index, c)" />
+                    </div>
+                    <div ng-if="s.tipo=='escalonado'">
+                        Segundos total:<input type="number" ng-model="s.tiempoTotal" ng-change="s.tiempoLed = 1000*s.tiempoTotal /numLeds" /><br />
+                        Millisegundos entre led:<input type="number" ng-model="s.tiempoLed" ng-change="s.tiempoTotal = s.tiempoLed * numLeds/1000" />
+                    </div>
+                    <div ng-if="s.tipo=='pausa'">
+                        Millisegundos total:<input type="number" ng-model="s.pausa" />
+                    </div>
+                    <button class="delete-bloque" ng-click="secciones.splice($index,1)">Eliminar Bloque</button>
+                </div>
+                <div>
+                    <input type="button" ng-click="secciones.push({ tipo:'bloque', colores:['#f3900f'] });" value="X Agregar bloque" />
+                </div>
+            </div>
+            <div class="media" style="flex:3">
+                <input type="button" value="Run" ng-click="Run()" />
+                <div class="luces">
+                    <span ng-repeat="l in luces track by $index" ng-style="{'background-color':l,'box-shadow': '0 0 12px '+l}"></span>
+                </div>
+            </div>
+        </div>
+        <div class="main">
+            <div class="completo">
+                #include &lt;Adafruit_NeoPixel.h&gt;<br />
+                #ifdef __AVR__<br />
+                #include &lt;avr/power.h&gt; // Required for 16 MHz Adafruit Trinket<br />
+                #endif<br />
+                <br />
+                // Which pin on the Arduino is connected to the NeoPixels?<br />
+                #define PIN        5<br />
+
+                // How many NeoPixels are attached to the Arduino?<br />
+                #define NUMPIXELS {{numLeds}}<br />
+                int buttonState = 0;<br />
+                // When setting up the NeoPixel library, we tell it how many pixels,<br />
+                // and which pin to use to send signals. Note that for older NeoPixel<br />
+                // strips you might need to change the third parameter -- see the<br />
+                // strandtest example for more information on possible values.<br />
+                Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);<br />
+                <br />
+                void setup() {<br />
+                &nbsp;&nbsp;Serial.begin(9600);<br />
+                &nbsp;&nbsp;// These lines are specifically to support the Adafruit Trinket 5V 16 MHz.<br />
+                &nbsp;&nbsp;// Any other board, you can remove this part (but no harm leaving it):<br />
+                <br />
+                &nbsp;&nbsp;pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)<br />
+                <div ng-repeat="s in secciones">
+                    <div ng-if="s.tipo=='escalonado'">
+                        &nbsp;&nbsp;for(int i=0; i&lt;NUMPIXELS; i++) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;pixels.setPixelColor(i, pixels.Color({{getRed(s.colores[0])}}, {{getGreen(s.colores[0])}}, {{getBlue(s.colores[0])}}));<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;pixels.show();<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;delay({{s.tiempoLed}}); // Pause before next pass through loop<br />
+                        &nbsp;&nbsp;}<br />
+                    </div>
+                    <div ng-if="s.tipo=='bloque'">
+                        &nbsp;&nbsp;for(int i=0; i&lt;NUMPIXELS; i++) {<br />
+                        &nbsp;&nbsp;&nbsp;&nbsp;pixels.setPixelColor(i, pixels.Color({{getRed(s.colores[0])}}, {{getGreen(s.colores[0])}}, {{getBlue(s.colores[0])}}));<br />
+                        &nbsp;&nbsp;}<br />
+                        &nbsp;&nbsp;pixels.show();<br />
+                    </div>
+                    <div ng-if="s.tipo=='pausa'">
+                        &nbsp;&nbsp;delay({{s.pausa}});<br />
+                    </div>
+                </div>
+                }<br />
+                <br />
+                void loop() {<br />
+                <br />
+                }<br />
+
+            </div>
+        </div>
+    </div>
+    <script src="angular.min.js"></script>
+    <script>
+        var app = angular.module('myApp', []);
+        var $scopeOut;
+        //, ['$scope', '$timeout', function ($scope, $timeout)
+        app.controller('myCtrl', function ($scope, $timeout) {
+
+            $scope.getRed = function (color) {
+                return parseInt("0x" + color.substring(1, 3));
+            }
+            $scope.getGreen = function (color) {
+                return parseInt("0x" + color.substring(3, 5))
+            }
+            $scope.getBlue = function (color) {
+                return parseInt("0x" + color.substring(5, 7))
+            }
+            $scope.colorPicked = function (bloque, colorIndex, color) {
+                //console.log(bloqueIndex, colorIndex, color);
+                bloque.colores[colorIndex] = color;
+            }
+            $scope.CargarGuardados = function () {
+                $scope.guardados = [];
+                for (g in window.localStorage) {
+                    if (g.startsWith("SecuenciaGuardada_")) {
+                        var regexReplace = /^SecuenciaGuardada_/;
+                        $scope.guardados.push({ nombre: g.replace(regexReplace, "") });
+                    }
+                }
+            }
+            $scope.Guardar = function () {
+                localStorage.setItem("SecuenciaGuardada_" + $scope.nombreArchivo, JSON.stringify({ secciones: $scope.secciones, numLeds: $scope.numLeds }));
+                $scope.CargarGuardados();
+            }
+            $scope.Eliminar = function (nombre) {
+                window.localStorage.removeItem("SecuenciaGuardada_" + nombre);
+                for (var i = 0; i < $scope.guardados.length; i++) {
+                    if ($scope.guardados[i].nombre == nombre)
+                        $scope.guardados.splice(i, 1);
+                }
+            }
+            $scope.Seleccionar = function (nombre) {
+                var guardado = JSON.parse(window.localStorage.getItem("SecuenciaGuardada_" + nombre));
+                $scope.secciones = guardado.secciones;
+                $scope.numLeds = guardado.numLeds;
+                $scope.nombreArchivo = nombre;
+            }
+            $scope.Run = function () {
+                var leds = [];
+                for (var i = 0; i < $scope.numLeds; i++) {
+                    leds.push("#000000");
+                }
+                $scope.luces = leds;
+                $scope.RunBloques(0, 0);
+            }
+            $scope.RunBloques = function (indexBloque, led) {
+                if (indexBloque >= $scope.secciones.length)
+                    return;
+                var bloqueActual = $scope.secciones[indexBloque];
+                if (bloqueActual.tipo == 'bloque') {
+                    for (var i = 0; i < $scope.numLeds; i++) {
+                        $scope.luces[i] = bloqueActual.colores[0];
+                    }
+                    $scope.RunBloques(indexBloque + 1, 0);
+                }
+                if (bloqueActual.tipo == 'escalonado') {
+                    $scope.luces[led] = bloqueActual.colores[0];
+                    led++;
+                    if (led < $scope.numLeds) {
+                        $timeout(function () { $scope.RunBloques(indexBloque, led) }, bloqueActual.tiempoLed);
+                    }
+                    else {
+                        $scope.RunBloques(indexBloque + 1, 0);
+                    }
+                }
+                if (bloqueActual.tipo == 'pausa') {
+                    $timeout(function () { $scope.RunBloques(indexBloque + 1, 0) }, bloqueActual.pausa);
+                }
+            }
+            $scopeOut = $scope;
+            $scope.secciones = [{ tipo: "bloque", colores: ["#f3900f"] }];
+            $scope.luces = ['#863412', '#123486', '#128634', '#FF8585', '#FFFFFF', '#7985AD'];
+            // $scope.button = 0;
+            $scope.numLeds = 15;
+            $scope.CargarGuardados();
+        });
+    </script>
+</body>
+</html>
